@@ -4,57 +4,117 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-FA Report Analyzer v2.0 is a professional Failure Analysis (FA) report evaluation tool that uses AI to analyze and score FA reports. The tool supports multiple LLM backends (Ollama, OpenAI, Anthropic) and can process both text and images from various document formats.
+**FA Report Analyzer v3.0** is a Web-based Failure Analysis (FA) report evaluation tool that uses AI to analyze and score FA reports. Built as a modern web application with FastAPI backend and pure HTML/CSS/JavaScript frontend.
 
-## Core Architecture
+**Key Features:**
+- 🌐 Web-based interface (no installation required)
+- 🤖 Multi-LLM backend support (Ollama, OpenAI, Anthropic)
+- 📄 Multi-format document processing (PDF, DOCX, PPTX, TXT, images)
+- 📊 Visual analytics with charts and dashboards
+- 📝 6-dimension evaluation framework
+- 💾 Analysis history management
+- 🐳 Docker containerization ready
 
-### Main Component
+---
 
-**`fa_report_analyzer_v2.py`** - Primary analyzer with multi-backend support
+## Architecture Overview
 
-Core class: `FAReportAnalyzer`
-- Initializes with backend selection (ollama/openai/anthropic)
-- Manages multi-modal analysis (text + images)
-- Implements 6-dimension evaluation framework
-- Generates structured assessment reports
+### Technology Stack
 
-### Multi-Backend Design
+**Backend:**
+- Framework: FastAPI 0.104+
+- Database: SQLite (development) / PostgreSQL (production)
+- ORM: SQLAlchemy 2.0+
+- Task Queue: FastAPI BackgroundTasks (MVP)
+- Core Logic: Reuses v2.0 analysis engine
 
-The analyzer abstracts different LLM providers through a unified interface:
-- `_analyze_with_ollama()` - Local inference using Ollama
-- `_analyze_with_openai()` - OpenAI API integration (v2.0.1: defaults to `gpt-4o-mini-2024-07-18`)
-- `_analyze_with_anthropic()` - Anthropic Claude API integration
+**Frontend:**
+- Core: Pure HTML5 + CSS3 + Vanilla JavaScript (ES6+)
+- UI Framework: Bootstrap 5 (CDN)
+- Charts: ECharts (CDN)
+- HTTP: Fetch API (native)
+- No build tools required
 
-Each backend method handles provider-specific message formatting, image encoding, and response parsing.
+**Deployment:**
+- Containerization: Docker + Docker Compose
+- Static Files: Served by FastAPI
+- Single-server deployment
 
-**Important**: The `--skip-images` flag can be used to perform text-only analysis, which is useful for avoiding OpenAI content moderation issues.
+---
 
-### Document Processing Pipeline
+## Project Structure
 
-1. **read_report()** - Extracts content from various formats
-   - Text: TXT, PDF, DOCX, PPTX
-   - Images: JPG, PNG, GIF, WEBP
-   - Embedded images from PDF/DOCX/PPTX
+```
+fa_report_analyzer_v3/
+├── backend/                     # FastAPI application
+│   ├── app/
+│   │   ├── main.py             # FastAPI entry point
+│   │   ├── config.py           # Configuration management
+│   │   ├── database.py         # Database setup
+│   │   ├── models/             # SQLAlchemy models
+│   │   ├── schemas/            # Pydantic schemas
+│   │   ├── api/                # API routes
+│   │   ├── services/           # Business logic
+│   │   ├── core/               # Core utilities
+│   │   └── static/             # Frontend files
+│   ├── tests/                  # Test suite
+│   ├── uploads/                # Temporary file storage
+│   ├── results/                # Analysis results
+│   └── requirements.txt        # Python dependencies
+├── docs/                        # Documentation
+├── .gitignore
+└── sample_fa_report.txt        # Test data
+```
 
-2. **analyze_with_ai()** - Routes to appropriate backend
-   - Constructs evaluation prompt with dimension criteria
-   - Handles multi-modal content (text + images)
-   - Returns structured JSON result
+---
 
-3. **generate_report()** - Formats evaluation output
-   - Tabular dimension scores using pandas
-   - Prioritized improvement suggestions
-   - Comprehensive summary with grade classification
+## Development Workflow
+
+### Environment Setup
+
+```bash
+cd fa_report_analyzer_v3/backend
+python -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+```
+
+### Running Development Server
+
+```bash
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+
+# Access:
+# Frontend: http://localhost:8000
+# API Docs: http://localhost:8000/docs
+```
+
+---
+
+## API Endpoints
+
+```
+POST   /api/v1/upload              # Upload file
+POST   /api/v1/analyze             # Start analysis
+GET    /api/v1/analyze/{task_id}   # Query status
+GET    /api/v1/result/{task_id}    # Get result
+GET    /api/v1/history             # List history
+POST   /api/v1/config              # Save config
+GET    /api/v1/health              # Health check
+```
+
+---
 
 ## Evaluation Framework
 
-**6 Dimensions with Weighted Scoring:**
-- Basic Information Completeness (15%)
-- Problem Description & Definition (15%)
-- Analysis Method & Process (20%)
-- Data & Evidence Support (20%)
-- Root Cause Analysis (20%)
-- Corrective Actions (10%)
+Same 6-dimension framework from v2.0:
+
+1. **Basic Information Completeness** (15%)
+2. **Problem Description & Definition** (15%)
+3. **Analysis Method & Process** (20%)
+4. **Data & Evidence Support** (20%)
+5. **Root Cause Analysis** (20%)
+6. **Corrective Actions** (10%)
 
 **Grade Classification:**
 - A (90-100): Excellent
@@ -63,185 +123,67 @@ Each backend method handles provider-specific message formatting, image encoding
 - D (60-69): Needs Improvement
 - F (<60): Inadequate
 
-## Development Commands
+---
 
-### Environment Setup
+## Deployment
+
+### Docker Deployment
+
 ```bash
-# Install dependencies
-pip install anthropic ollama python-pptx python-dotenv --break-system-packages
-
-# Additional optional dependencies
-pip install PyPDF2 PyMuPDF python-docx Pillow --break-system-packages
+docker-compose up -d
+docker-compose logs -f
+docker-compose down
 ```
 
-### Running Analysis
+### Environment Variables
 
-**With Ollama (default):**
-```bash
-# Ensure Ollama is running
-ollama serve
-
-# Run analysis
-python fa_report_analyzer_v2.py -i sample_fa_report.txt
+```env
+DATABASE_URL=sqlite:///./fa_analyzer.db
+ENCRYPTION_KEY=your-secret-key
+MAX_FILE_SIZE=52428800
 ```
 
-**With OpenAI:**
-```bash
-# Uses default gpt-4o-mini-2024-07-18
-python fa_report_analyzer_v2.py -i report.pdf -b openai -k YOUR_API_KEY
-
-# Specify different model
-python fa_report_analyzer_v2.py -i report.pdf -b openai -m gpt-4o -k YOUR_API_KEY
-
-# Skip images (text-only analysis)
-python fa_report_analyzer_v2.py -i report.pdf -b openai -k YOUR_API_KEY --skip-images
-```
-
-**With Anthropic:**
-```bash
-python fa_report_analyzer_v2.py -i report.pdf -b anthropic -k YOUR_API_KEY
-```
-
-### Testing
-```bash
-# Quick test with sample report
-python fa_report_analyzer_v2.py -i sample_fa_report.txt -o test_output.txt
-
-# Test with different model
-python fa_report_analyzer_v2.py -i report.pdf -m llama3.2-vision:latest
-```
-
-## Key Implementation Details
-
-### Image Handling
-Images are extracted from documents and encoded as base64 for transmission to vision-capable models. The system limits images per analysis:
-- Ollama: 5 images max
-- OpenAI: 10 images max
-- Anthropic: 20 images max
-
-**New in v2.0.1**: Use `--skip-images` to perform text-only analysis, bypassing image processing entirely. This is useful when:
-- Avoiding OpenAI content moderation issues
-- Reducing API costs
-- Faster processing for text-heavy reports
-
-### JSON Response Parsing
-AI responses must return pure JSON without markdown code blocks. The system strips common formatting artifacts:
-```python
-response_text = response_text.replace('```json', '').replace('```', '').strip()
-result = json.loads(response_text)
-```
-
-### Error Handling
-The analyzer gracefully degrades when optional dependencies are unavailable:
-- PIL for image processing
-- PyMuPDF for PDF image extraction
-- python-docx for Word documents
-- python-pptx for PowerPoint files
-
-## Customization Points
-
-### Modifying Evaluation Weights
-Edit the `dimensions` dictionary in `FAReportAnalyzer.__init__()`:
-```python
-self.dimensions = {
-    "基本資訊完整性": 15,  # Change percentages as needed
-    "問題描述與定義": 15,
-    # ... other dimensions
-}
-```
-
-### Adjusting Grade Criteria
-Modify `grade_criteria` dictionary to change score thresholds:
-```python
-self.grade_criteria = {
-    'A': (90, 100, '卓越報告'),
-    # ... other grades
-}
-```
-
-### Custom Prompts
-The `create_analysis_prompt()` method constructs the evaluation prompt. Modify this to adjust AI behavior and evaluation criteria.
-
-## File Organization
-
-**Main Files:**
-- `fa_report_analyzer_v2.py` - Current version with multi-backend
-- `fa_report_analyzer.py` - Legacy v1.0 (Anthropic only)
-- `sample_fa_report.txt` - Test data
-
-**Documentation:**
-- `README.md` - v1.0 documentation (Chinese)
-- `README_v2.md` - v2.0 documentation (Chinese)
-- `MIGRATION_GUIDE.md` - v1 to v2 migration guide
-- `OLLAMA_SETUP.md` - Ollama installation guide
-- `PPT_FORMAT_GUIDE.md` - PowerPoint format conversion
-
-**Configuration:**
-- `pyproject.toml` - uv package manager config
-- `requirements.txt` - pip dependencies
-
-## Important Notes
-
-### API Key Management
-- Never hardcode API keys in source files
-- Pass via `-k` argument or environment variables
-- Default to Ollama backend to avoid requiring API keys
-
-### PowerPoint Format Compatibility
-- `python-pptx` only supports `.pptx` (Office 2007+)
-- `.ppt` files require conversion via LibreOffice or manual conversion
-- See `PPT_FORMAT_GUIDE.md` for conversion workflows
-
-### Backend Selection Strategy
-- **Ollama**: Default, local inference, no API costs, requires model download
-- **OpenAI**: Best image understanding, requires API key and costs money (v2.0.1 defaults to cost-efficient `gpt-4o-mini-2024-07-18`)
-- **Anthropic**: Balanced performance, requires API key and costs money
-
-**Model Version Notes (v2.0.1)**:
-- OpenAI backend now uses `gpt-4o-mini-2024-07-18` by default (lighter, faster, cheaper)
-- Previous default `gpt-4o` can still be used with `-m gpt-4o`
-- Alternative models are commented in code: `gpt-4.1-mini`, `gpt-4o-2024-05-13`
-
-### Chinese Language Context
-This project is designed for Chinese-language FA reports. All prompts, documentation, and output are in Traditional Chinese. The evaluation criteria are based on semiconductor industry FA report standards.
+---
 
 ## Common Tasks
 
-### Adding New Document Format Support
-1. Add format detection in `read_report()`
-2. Implement extraction logic for text and images
-3. Handle ImportError for optional dependencies
-4. Test with sample documents
+### Adding New LLM Backend
+1. Update `FAReportAnalyzer` in `core/fa_analyzer_core.py`
+2. Add new analysis method
+3. Update model list in API
+4. Add UI configuration
 
-### Supporting New LLM Backend
-1. Add backend choice to argparse options
-2. Implement `_analyze_with_<backend>()` method
-3. Handle backend-specific message formatting
-4. Update `_init_client()` for client initialization
+### Modifying Evaluation Criteria
+Edit dimensions in `core/fa_analyzer_core.py`
 
-### Batch Processing
-Create a script that iterates over multiple reports:
-```python
-analyzer = FAReportAnalyzer(backend="ollama")
-for report_file in glob.glob("reports/*.pdf"):
-    result = analyzer.analyze_report(report_file)
-```
+### Customizing UI Theme
+Edit `static/css/style.css` or Bootstrap variables
+
+---
+
+## Migration from v2.0
+
+| Aspect | v2.0 (CLI) | v3.0 (Web) |
+|--------|------------|------------|
+| Interface | Command line | Web browser |
+| Analysis | Synchronous | Asynchronous |
+| Results | Text file | Database + formats |
+| Deployment | Python script | Docker container |
+
+---
 
 ## Version History
 
-- **v2.0.2** (2025-12-01):
-  - Added automatic temporary file cleanup for PPT conversions
-  - Implemented `_cleanup_temp_files()` method with try-finally pattern
-  - Enhanced AI prompts to explicitly request Traditional Chinese responses
-  - Removed uv package manager configuration files (.python-version, uv.lock)
-  - Improved resource management and error handling
+- **v3.0.0** (2025-12-01): Web application with FastAPI + HTML/CSS/JS
+- **v2.0.2** (2025-12-01): CLI with temp file cleanup
+- **v2.0** (2024-11-20): Multi-backend CLI tool
+- **v1.0** (2024-11-20): Initial version
 
-- **v2.0.1** (2025-11-24):
-  - Changed OpenAI default model to `gpt-4o-mini-2024-07-18`
-  - Added `--skip-images` flag for text-only analysis
-  - Enhanced OpenAI content moderation error handling
-  - Added detailed JSON parsing error messages
-  - Output raw LLM responses for debugging
+---
 
-- **v2.0** (2024-11-20): Multi-backend support (Ollama/OpenAI/Anthropic), image analysis, PPTX support
-- **v1.0** (2024-11-20): Initial version with Anthropic Claude only
+## Resources
+
+- Planning Documents: `docs/web_v3.0/`
+- [FastAPI Documentation](https://fastapi.tiangolo.com/)
+- [Bootstrap 5 Documentation](https://getbootstrap.com/docs/5.3/)
+- [ECharts Documentation](https://echarts.apache.org/)
