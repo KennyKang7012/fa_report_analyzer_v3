@@ -4,10 +4,439 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>FA Report Analyzer v3.0</title>
+
+    <!-- Bootstrap 5 -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
+
+    <!-- 自定義樣式 -->
+    <link rel="stylesheet" href="/static/css/style.css">
 </head>
 <body>
-    <h1>FA Report Analyzer v3.0</h1>
-    <p>FastAPI backend is running successfully!</p>
-    <p>This is a placeholder page. Full frontend will be implemented in Phase 3.</p>
+    <!-- 導航欄 -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="#home">
+                <i class="bi bi-clipboard-data"></i> FA Report Analyzer v3.0
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto">
+                    <li class="nav-item">
+                        <a class="nav-link active" href="#home">
+                            <i class="bi bi-house"></i> 首頁
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#history">
+                            <i class="bi bi-clock-history"></i> 歷史記錄
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#settings">
+                            <i class="bi bi-gear"></i> 設定
+                        </a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <!-- 主內容 -->
+    <div class="container mt-4">
+        <!-- 上傳頁面 -->
+        <div id="page-upload" class="page">
+            <div class="row justify-content-center">
+                <div class="col-lg-8">
+                    <h2 class="mb-4">
+                        <i class="bi bi-file-earmark-arrow-up"></i> 上傳 FA 報告
+                    </h2>
+
+                    <!-- 文件上傳區域 -->
+                    <div id="drop-area" class="mb-4">
+                        <i class="bi bi-cloud-upload"></i>
+                        <p class="mt-3 mb-2">拖拽文件到此處或點擊選擇</p>
+                        <p class="text-muted small">支援格式: PDF, DOCX, PPTX, TXT, JPG, PNG (最大 50MB)</p>
+                        <input type="file" id="file-input" class="d-none"
+                               accept=".pdf,.docx,.pptx,.txt,.jpg,.jpeg,.png,.gif,.webp">
+                        <button id="select-file-btn" class="btn btn-primary mt-2">
+                            <i class="bi bi-folder2-open"></i> 選擇文件
+                        </button>
+                    </div>
+
+                    <!-- 文件信息 -->
+                    <div id="file-info" class="alert alert-info d-none">
+                        <h5><i class="bi bi-file-earmark-check"></i> 已選擇文件</h5>
+                        <p class="mb-1"><strong>文件名:</strong> <span id="file-name"></span></p>
+                        <p class="mb-0"><strong>大小:</strong> <span id="file-size"></span></p>
+                    </div>
+
+                    <!-- 上傳進度 -->
+                    <div id="upload-progress" class="mb-3 d-none">
+                        <label class="form-label">上傳進度</label>
+                        <div class="progress">
+                            <div class="progress-bar progress-bar-striped progress-bar-animated"
+                                 role="progressbar" style="width: 0%">0%</div>
+                        </div>
+                    </div>
+
+                    <!-- 分析配置 -->
+                    <div class="card mb-3">
+                        <div class="card-header">
+                            <h5 class="mb-0"><i class="bi bi-sliders"></i> 分析配置</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label for="backend-select" class="form-label">LLM 後端</label>
+                                    <select id="backend-select" class="form-select">
+                                        <option value="ollama" selected>Ollama (本地)</option>
+                                        <option value="openai">OpenAI</option>
+                                        <option value="anthropic">Anthropic Claude</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label for="model-select" class="form-label">模型 (可選)</label>
+                                    <input type="text" id="model-select" class="form-control"
+                                           placeholder="留空使用默認模型">
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                <label for="api-key-input" class="form-label">API Key (可選)</label>
+                                <input type="password" id="api-key-input" class="form-control"
+                                       placeholder="使用 OpenAI/Anthropic 時需要">
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="skip-images">
+                                <label class="form-check-label" for="skip-images">
+                                    跳過圖片分析 (加快速度)
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 開始分析按鈕 -->
+                    <div class="d-grid">
+                        <button id="start-analysis-btn" class="btn btn-success btn-lg" disabled>
+                            <i class="bi bi-play-circle"></i> 開始分析
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 分析進度頁面 -->
+        <div id="page-analysis" class="page" style="display:none;">
+            <div class="row justify-content-center">
+                <div class="col-lg-8">
+                    <h2 class="mb-4">
+                        <i class="bi bi-hourglass-split"></i> 分析進度
+                    </h2>
+
+                    <div class="card">
+                        <div class="card-body text-center">
+                            <div class="spinner-border text-primary mb-3" role="status" style="width: 4rem; height: 4rem;">
+                                <span class="visually-hidden">分析中...</span>
+                            </div>
+                            <h4 id="analysis-status">正在分析...</h4>
+                            <p id="analysis-message" class="text-muted">請稍候</p>
+
+                            <div class="progress mb-3" style="height: 30px;">
+                                <div id="analysis-progress-bar" class="progress-bar progress-bar-striped progress-bar-animated"
+                                     role="progressbar" style="width: 0%">0%</div>
+                            </div>
+
+                            <p class="small text-muted">任務 ID: <span id="task-id-display"></span></p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 結果頁面 -->
+        <div id="page-result" class="page" style="display:none;">
+            <div class="row">
+                <div class="col-12">
+                    <div class="d-flex justify-content-between align-items-center mb-4">
+                        <h2><i class="bi bi-clipboard-check"></i> 分析結果</h2>
+                        <button id="new-analysis-btn" class="btn btn-primary">
+                            <i class="bi bi-plus-circle"></i> 新分析
+                        </button>
+                    </div>
+
+                    <!-- 總分卡片 -->
+                    <div class="row mb-4">
+                        <div class="col-md-4">
+                            <div class="card score-card">
+                                <div class="card-body">
+                                    <h5>總分</h5>
+                                    <div class="score" id="total-score">--</div>
+                                    <h3 id="total-grade" class="badge">--</h3>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-8">
+                            <div class="card">
+                                <div class="card-body">
+                                    <h5 class="card-title">下載報告</h5>
+                                    <div class="btn-group">
+                                        <button id="download-txt-btn" class="btn btn-outline-primary">
+                                            <i class="bi bi-file-text"></i> TXT 格式
+                                        </button>
+                                        <button id="download-json-btn" class="btn btn-outline-primary">
+                                            <i class="bi bi-filetype-json"></i> JSON 格式
+                                        </button>
+                                    </div>
+                                    <div class="mt-3">
+                                        <p class="small text-muted mb-0">
+                                            <strong>文件名:</strong> <span id="result-filename">--</span>
+                                        </p>
+                                        <p class="small text-muted mb-0">
+                                            <strong>分析時間:</strong> <span id="result-time">--</span>
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 雷達圖 -->
+                    <div class="card mb-4">
+                        <div class="card-header">
+                            <h5 class="mb-0"><i class="bi bi-radar"></i> 6 維度評分</h5>
+                        </div>
+                        <div class="card-body">
+                            <div id="radar-chart" style="width: 100%; height: 400px;"></div>
+                        </div>
+                    </div>
+
+                    <!-- 評分詳情表格 -->
+                    <div class="card mb-4">
+                        <div class="card-header">
+                            <h5 class="mb-0"><i class="bi bi-table"></i> 評分詳情</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="table-responsive">
+                                <table class="table table-hover">
+                                    <thead>
+                                        <tr>
+                                            <th>維度</th>
+                                            <th>得分</th>
+                                            <th>百分比</th>
+                                            <th>權重</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="dimension-scores-table">
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 優點與改進建議 -->
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="card mb-4">
+                                <div class="card-header bg-success text-white">
+                                    <h5 class="mb-0"><i class="bi bi-hand-thumbs-up"></i> 優點</h5>
+                                </div>
+                                <div class="card-body">
+                                    <ul id="strengths-list" class="list-unstyled">
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="card mb-4">
+                                <div class="card-header bg-warning">
+                                    <h5 class="mb-0"><i class="bi bi-lightbulb"></i> 改進建議</h5>
+                                </div>
+                                <div class="card-body">
+                                    <ul id="improvements-list" class="list-unstyled">
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 歷史記錄頁面 -->
+        <div id="page-history" class="page" style="display:none;">
+            <div class="row">
+                <div class="col-12">
+                    <h2 class="mb-4">
+                        <i class="bi bi-clock-history"></i> 歷史記錄
+                    </h2>
+
+                    <!-- 正在分析提示橫幅 -->
+                    <div id="processing-task-alert" class="alert alert-info d-none mb-3" role="alert">
+                        <div class="d-flex align-items-center justify-content-between">
+                            <div>
+                                <i class="bi bi-info-circle-fill me-2"></i>
+                                <strong>有分析正在進行中</strong>
+                                <span id="processing-task-info" class="ms-2"></span>
+                            </div>
+                            <button id="return-to-analysis-btn" class="btn btn-sm btn-primary">
+                                <i class="bi bi-arrow-left-circle"></i> 返回查看進度
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- 搜尋篩選 -->
+                    <div class="card mb-3">
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <input type="text" id="history-search" class="form-control"
+                                           placeholder="搜尋文件名...">
+                                </div>
+                                <div class="col-md-4">
+                                    <select id="history-filter" class="form-select">
+                                        <option value="">所有狀態</option>
+                                        <option value="completed">已完成</option>
+                                        <option value="failed">失敗</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-2">
+                                    <button id="history-refresh-btn" class="btn btn-primary w-100">
+                                        <i class="bi bi-arrow-clockwise"></i> 刷新
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 歷史列表 -->
+                    <div class="card">
+                        <div class="card-body">
+                            <div class="table-responsive">
+                                <table class="table table-hover">
+                                    <thead>
+                                        <tr>
+                                            <th>文件名</th>
+                                            <th>總分</th>
+                                            <th>等級</th>
+                                            <th>狀態</th>
+                                            <th>時間</th>
+                                            <th>操作</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="history-table-body">
+                                        <tr>
+                                            <td colspan="6" class="text-center text-muted">
+                                                載入中...
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 設定頁面 -->
+        <div id="page-settings" class="page" style="display:none;">
+            <div class="row justify-content-center">
+                <div class="col-lg-8">
+                    <h2 class="mb-4">
+                        <i class="bi bi-gear"></i> 系統設定
+                    </h2>
+
+                    <div class="card mb-3">
+                        <div class="card-header">
+                            <h5 class="mb-0"><i class="bi bi-cpu"></i> 默認 LLM 配置</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="mb-3">
+                                <label for="default-backend" class="form-label">默認後端</label>
+                                <select id="default-backend" class="form-select">
+                                    <option value="ollama">Ollama (本地)</option>
+                                    <option value="openai">OpenAI</option>
+                                    <option value="anthropic">Anthropic Claude</option>
+                                </select>
+                            </div>
+                            <div class="mb-3">
+                                <label for="default-model" class="form-label">默認模型</label>
+                                <input type="text" id="default-model" class="form-control"
+                                       placeholder="例如: llama2, gpt-4, claude-3">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card mb-3">
+                        <div class="card-header">
+                            <h5 class="mb-0"><i class="bi bi-key"></i> API Key 管理</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="mb-3">
+                                <label for="openai-api-key" class="form-label">OpenAI API Key</label>
+                                <input type="password" id="openai-api-key" class="form-control"
+                                       placeholder="sk-...">
+                            </div>
+                            <div class="mb-3">
+                                <label for="anthropic-api-key" class="form-label">Anthropic API Key</label>
+                                <input type="password" id="anthropic-api-key" class="form-control"
+                                       placeholder="sk-ant-...">
+                            </div>
+                            <p class="small text-muted">
+                                <i class="bi bi-shield-lock"></i> API Key 將加密存儲在本地資料庫
+                            </p>
+                        </div>
+                    </div>
+
+                    <div class="card mb-3">
+                        <div class="card-header">
+                            <h5 class="mb-0"><i class="bi bi-gear-wide-connected"></i> 其他設定</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="form-check mb-2">
+                                <input class="form-check-input" type="checkbox" id="default-skip-images">
+                                <label class="form-check-label" for="default-skip-images">
+                                    默認跳過圖片分析
+                                </label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="auto-download">
+                                <label class="form-check-label" for="auto-download">
+                                    分析完成後自動下載報告
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="d-grid gap-2">
+                        <button id="save-settings-btn" class="btn btn-success btn-lg">
+                            <i class="bi bi-check-circle"></i> 保存設定
+                        </button>
+                        <button id="reset-settings-btn" class="btn btn-outline-secondary">
+                            <i class="bi bi-arrow-counterclockwise"></i> 恢復默認
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 頁尾 -->
+    <footer class="mt-5 py-3 bg-light text-center">
+        <p class="text-muted mb-0">
+            FA Report Analyzer v3.0 | Powered by FastAPI + Vanilla JS
+        </p>
+    </footer>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+    <!-- ECharts -->
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+
+    <!-- 應用 JS (模組化) -->
+    <script type="module" src="/static/js/app.js"></script>
 </body>
 </html>

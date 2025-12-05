@@ -5,7 +5,11 @@
       "Bash(python -m venv venv)",
       "Bash(venv/Scripts/pip install:*)",
       "Bash(venv/Scripts/python:*)",
-      "Bash(curl:*)"
+      "Bash(curl:*)",
+      "Bash(dir:*)",
+      "Bash(python -m json.tool:*)",
+      "Bash(echo:*)",
+      "Bash(git add:*)"
     ],
     "deny": [],
     "ask": []

@@ -14,6 +14,7 @@ class DimensionScore(BaseModel):
 class AnalysisResult(BaseModel):
     """Schema for analysis result"""
     task_id: str
+    filename: str
     total_score: float
     max_total_score: float
     percentage: float
@@ -22,6 +23,7 @@ class AnalysisResult(BaseModel):
     strengths: List[str]
     improvements: List[str]
     summary: str
+    timestamp: Optional[str] = None
     analysis_time: Optional[str] = None
 
 

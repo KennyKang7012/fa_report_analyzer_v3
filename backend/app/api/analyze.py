@@ -100,7 +100,8 @@ async def create_analysis_task(
         )
 
     file_path = str(matching_files[0])
-    filename = matching_files[0].name
+    # 使用用戶提供的原始文件名,如果沒有則使用服務器文件名
+    filename = request.filename if request.filename else matching_files[0].name
 
     # 驗證 backend
     valid_backends = ["ollama", "openai", "anthropic"]

@@ -61,10 +61,47 @@ async def get_analysis_result(task_id: str, db: Session = Depends(get_db)):
 
     logger.info(f"返回分析結果: {task_id}")
 
+    # 轉換數據格式以符合 schema
+    result = task.result
+
+    # 轉換 dimension_scores 格式
+    dimension_scores = {}
+    for dim_name, dim_data in result.get("dimension_scores", {}).items():
+        # 計算 max_score (基於 percentage 和 score)
+        score = dim_data.get("score", 0)
+        percentage = dim_data.get("percentage", 0)
+        max_score = (score / percentage * 100) if percentage > 0 else 15
+
+        dimension_scores[dim_name] = {
+            "name": dim_name,
+            "score": score,
+            "max_score": max_score,
+            "percentage": percentage,
+            "comments": [dim_data.get("comment", "")] if dim_data.get("comment") else []
+        }
+
+    # 轉換 improvements 為字符串列表
+    improvements = result.get("improvements", [])
+    if improvements and isinstance(improvements[0], dict):
+        # 如果是對象列表,轉換為字符串列表
+        improvements = [
+            f"[{item.get('priority', '中')}] {item.get('item', '')}: {item.get('suggestion', '')}"
+            for item in improvements
+        ]
+
     return {
         "task_id": task.id,
         "filename": task.filename,
-        **task.result
+        "total_score": result.get("total_score", 0),
+        "max_total_score": 100,
+        "percentage": result.get("total_score", 0),  # 總分即百分比
+        "grade": result.get("grade", "F"),
+        "dimension_scores": dimension_scores,
+        "strengths": result.get("strengths", []),
+        "improvements": improvements,
+        "summary": result.get("summary", ""),
+        "timestamp": task.completed_at.isoformat() if task.completed_at else None,
+        "analysis_time": task.completed_at.isoformat() if task.completed_at else None
     }
 
 
