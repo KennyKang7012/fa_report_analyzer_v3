@@ -44,23 +44,29 @@ async function checkProcessingTasks() {
             // 查詢任務狀態
             const task = await api.getAnalysisStatus(currentTaskId);
 
+            const alert = document.getElementById('processing-task-alert');
+            const info = document.getElementById('processing-task-info');
+            const btn = document.getElementById('return-to-analysis-btn');
+
             if (task.status === 'processing' || task.status === 'pending') {
                 // 顯示提示橫幅
-                const alert = document.getElementById('processing-task-alert');
-                const info = document.getElementById('processing-task-info');
-                const btn = document.getElementById('return-to-analysis-btn');
-
                 info.textContent = `- ${task.filename} (${task.progress}%)`;
                 alert.classList.remove('d-none');
 
                 // 綁定返回按鈕
                 btn.onclick = () => {
-                    router.navigateTo('analysis');
+                    router.navigate('analysis');
                 };
+            } else {
+                // 任務已完成或失敗，隱藏提示框並清除 sessionStorage
+                alert.classList.add('d-none');
+                sessionStorage.removeItem('currentTaskId');
             }
         }
     } catch (error) {
         console.error('[History] Failed to check processing tasks:', error);
+        // 發生錯誤時也清除 sessionStorage 避免一直顯示
+        sessionStorage.removeItem('currentTaskId');
     }
 }
 
