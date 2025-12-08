@@ -49,10 +49,55 @@ async function loadResult() {
         // 顯示結果
         displayResult(currentResult);
 
+        // 檢查是否需要自動下載
+        await checkAutoDownload();
+
     } catch (error) {
         console.error('[Result] Error loading result:', error);
         showGlobalError('載入結果失敗: ' + error.message);
         router.navigate('home');
+    }
+}
+
+/**
+ * 檢查並執行自動下載
+ */
+async function checkAutoDownload() {
+    try {
+        // 從本地存儲檢查
+        const savedConfig = localStorage.getItem('faAnalyzerConfig');
+        let autoDownload = false;
+
+        if (savedConfig) {
+            const config = JSON.parse(savedConfig);
+            autoDownload = config.auto_download === true;
+        }
+
+        // 從伺服器獲取配置（覆蓋本地配置）
+        try {
+            const serverConfig = await api.getConfig();
+            if (serverConfig && serverConfig.auto_download !== undefined) {
+                autoDownload = serverConfig.auto_download === true;
+            }
+        } catch (error) {
+            console.log('[Result] Server config not available, using localStorage');
+        }
+
+        // 如果啟用自動下載，則下載 TXT 格式報告
+        if (autoDownload) {
+            console.log('[Result] Auto-download enabled, downloading report...');
+            // 延遲 1 秒後下載，讓用戶看到結果頁面
+            setTimeout(async () => {
+                try {
+                    await api.downloadResult(currentTaskId, 'txt');
+                    showGlobalSuccess('報告已自動下載');
+                } catch (error) {
+                    console.error('[Result] Auto-download failed:', error);
+                }
+            }, 1000);
+        }
+    } catch (error) {
+        console.error('[Result] Error checking auto-download:', error);
     }
 }
 

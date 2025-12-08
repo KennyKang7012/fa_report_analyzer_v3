@@ -83,23 +83,33 @@ async def get_config_by_key(key: str, db: Session = Depends(get_db)):
     }
 
 
-@router.post("/config", response_model=ConfigResponse)
-async def save_config(
-    config_item: ConfigItem,
+@router.post("/config")
+async def save_config_flexible(
+    request_data: dict,
     db: Session = Depends(get_db)
 ):
     """
-    保存或更新配置項
+    保存或更新配置（支持多種格式）
 
-    Args:
-        config_item: 配置項
-        - key: 配置鍵
-        - value: 配置值
-        - encrypt: 是否加密 (API Key 等敏感信息)
+    支持兩種格式：
+    1. 標準格式: {key: "...", value: "...", encrypt: bool}
+    2. 扁平格式: {default_backend: "...", default_model: "...", ...}
 
     Returns:
-        保存後的配置項
+        保存後的配置項或批量保存結果
     """
+    # 檢測數據格式
+    if 'key' in request_data and 'value' in request_data:
+        # 標準格式 - 單個配置項
+        config_item = ConfigItem(**request_data)
+        return await _save_single_config(config_item, db)
+    else:
+        # 扁平格式 - 批量配置
+        return await _save_flat_config(request_data, db)
+
+
+async def _save_single_config(config_item: ConfigItem, db: Session):
+    """保存單個配置項（內部方法）"""
     # 查找是否已存在
     existing = db.query(SystemConfig).filter(SystemConfig.key == config_item.key).first()
 
@@ -148,6 +158,48 @@ async def save_config(
     }
 
 
+async def _save_flat_config(config_data: dict, db: Session):
+    """保存扁平格式的配置（內部方法）"""
+    results = []
+
+    # 轉換扁平格式為 ConfigItem 列表
+    config_mapping = {
+        'default_backend': (False, str),
+        'default_model': (False, str),
+        'openai_api_key': (True, str),
+        'anthropic_api_key': (True, str),
+        'default_skip_images': (False, bool),
+        'auto_download': (False, bool)
+    }
+
+    for key, value in config_data.items():
+        if key in config_mapping:
+            encrypt, value_type = config_mapping[key]
+
+            # 跳過空值（API Key 為空時不更新）
+            if encrypt and (not value or value == ''):
+                continue
+
+            # 轉換值為字符串
+            if value_type == bool:
+                str_value = str(value).lower() if isinstance(value, bool) else str(value)
+            else:
+                str_value = str(value) if value else ''
+
+            # 創建並保存 ConfigItem
+            config_item = ConfigItem(
+                key=key,
+                value=str_value,
+                encrypt=encrypt
+            )
+
+            result = await _save_single_config(config_item, db)
+            results.append(result)
+
+    logger.info(f"扁平格式批量更新了 {len(results)} 個配置")
+    return {"message": "配置保存成功", "updated_count": len(results), "configs": results}
+
+
 @router.put("/config", response_model=List[ConfigResponse])
 async def batch_update_configs(
     configs: ConfigUpdate,
@@ -166,11 +218,68 @@ async def batch_update_configs(
 
     for config_item in configs.configs:
         # 重用單個保存的邏輯
-        result = await save_config(config_item, db)
+        result = await _save_single_config(config_item, db)
         results.append(result)
 
     logger.info(f"批量更新了 {len(results)} 個配置")
     return results
+
+
+@router.post("/config/batch")
+async def save_flat_config(
+    config_data: dict,
+    db: Session = Depends(get_db)
+):
+    """
+    保存扁平格式的配置（向後兼容）
+
+    接受前端發送的扁平格式配置並轉換為標準格式
+
+    Args:
+        config_data: 扁平格式的配置 {default_backend: "...", default_model: "...", ...}
+
+    Returns:
+        保存結果
+    """
+    results = []
+
+    # 轉換扁平格式為 ConfigItem 列表
+    config_mapping = {
+        'default_backend': (False, str),
+        'default_model': (False, str),
+        'openai_api_key': (True, str),
+        'anthropic_api_key': (True, str),
+        'default_skip_images': (False, bool),
+        'auto_download': (False, bool)
+    }
+
+    for key, value in config_data.items():
+        if key in config_mapping:
+            encrypt, value_type = config_mapping[key]
+
+            # 跳過空值（API Key 為空時不更新）
+            if encrypt and (not value or value == ''):
+                continue
+
+            # 轉換值為字符串
+            if value_type == bool:
+                str_value = str(value).lower() if isinstance(value, bool) else str(value)
+            else:
+                str_value = str(value) if value else ''
+
+            # 創建 ConfigItem
+            config_item = ConfigItem(
+                key=key,
+                value=str_value,
+                encrypt=encrypt
+            )
+
+            # 保存配置
+            result = await save_config(config_item, db)
+            results.append(result)
+
+    logger.info(f"扁平格式批量更新了 {len(results)} 個配置")
+    return {"message": "配置保存成功", "updated_count": len(results)}
 
 
 @router.delete("/config/{key}")

@@ -246,9 +246,27 @@ export const api = {
                 throw new Error(`獲取配置失敗 (${response.status})`);
             }
 
-            const result = await response.json();
+            const configItems = await response.json();
             console.log('[API] Config fetched');
-            return result;
+
+            // 將配置列表轉換為扁平對象
+            const config = {};
+            configItems.forEach(item => {
+                // 布爾值轉換
+                if (item.key === 'default_skip_images' || item.key === 'auto_download') {
+                    config[item.key] = item.value === 'true';
+                }
+                // API Key 設置標記
+                else if (item.key === 'openai_api_key' || item.key === 'anthropic_api_key') {
+                    config[`${item.key}_set`] = item.value && item.value !== '';
+                }
+                // 其他配置
+                else {
+                    config[item.key] = item.value;
+                }
+            });
+
+            return config;
         } catch (error) {
             console.error('[API] Get config error:', error);
             throw error;
@@ -262,12 +280,67 @@ export const api = {
      */
     async saveConfig(config) {
         try {
+            // 將配置對象轉換為後端期望的格式
+            const configItems = [];
+
+            // 基本配置
+            if (config.default_backend) {
+                configItems.push({
+                    key: 'default_backend',
+                    value: config.default_backend,
+                    encrypt: false
+                });
+            }
+
+            if (config.default_model) {
+                configItems.push({
+                    key: 'default_model',
+                    value: config.default_model,
+                    encrypt: false
+                });
+            }
+
+            // API Keys (需要加密)
+            if (config.openai_api_key) {
+                configItems.push({
+                    key: 'openai_api_key',
+                    value: config.openai_api_key,
+                    encrypt: true
+                });
+            }
+
+            if (config.anthropic_api_key) {
+                configItems.push({
+                    key: 'anthropic_api_key',
+                    value: config.anthropic_api_key,
+                    encrypt: true
+                });
+            }
+
+            // 布爾選項
+            if (config.default_skip_images !== undefined) {
+                configItems.push({
+                    key: 'default_skip_images',
+                    value: String(config.default_skip_images),
+                    encrypt: false
+                });
+            }
+
+            if (config.auto_download !== undefined) {
+                configItems.push({
+                    key: 'auto_download',
+                    value: String(config.auto_download),
+                    encrypt: false
+                });
+            }
+
+            // 使用批量更新接口
             const response = await fetch(`${API_BASE}/config`, {
-                method: 'POST',
+                method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json'
                 },
-                body: JSON.stringify(config)
+                body: JSON.stringify({ configs: configItems })
             });
 
             if (!response.ok) {

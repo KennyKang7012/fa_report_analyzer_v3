@@ -225,23 +225,46 @@ async function handleStartAnalysis() {
 /**
  * 載入保存的配置
  */
-function loadSavedConfig() {
+async function loadSavedConfig() {
     try {
+        // 先從本地存儲載入
         const savedConfig = localStorage.getItem('faAnalyzerConfig');
         if (savedConfig) {
             const config = JSON.parse(savedConfig);
 
-            if (config.backend) {
-                document.getElementById('backend-select').value = config.backend;
+            if (config.default_backend) {
+                document.getElementById('backend-select').value = config.default_backend;
             }
-            if (config.model) {
-                document.getElementById('model-select').value = config.model;
+            if (config.default_model) {
+                document.getElementById('model-select').value = config.default_model;
             }
-            if (config.skip_images !== undefined) {
-                document.getElementById('skip-images').checked = config.skip_images;
+            // 使用 default_skip_images（從系統設定）
+            if (config.default_skip_images !== undefined) {
+                document.getElementById('skip-images').checked = config.default_skip_images;
             }
 
-            console.log('[Upload] Loaded saved config');
+            console.log('[Upload] Loaded config from localStorage');
+        }
+
+        // 再從伺服器載入（覆蓋本地配置）
+        try {
+            const serverConfig = await api.getConfig();
+            if (serverConfig) {
+                if (serverConfig.default_backend) {
+                    document.getElementById('backend-select').value = serverConfig.default_backend;
+                }
+                if (serverConfig.default_model) {
+                    document.getElementById('model-select').value = serverConfig.default_model;
+                }
+                // 應用系統設定中的 default_skip_images
+                if (serverConfig.default_skip_images !== undefined) {
+                    document.getElementById('skip-images').checked = serverConfig.default_skip_images;
+                }
+
+                console.log('[Upload] Loaded config from server');
+            }
+        } catch (error) {
+            console.log('[Upload] Server config not available, using localStorage');
         }
     } catch (error) {
         console.error('[Upload] Error loading config:', error);

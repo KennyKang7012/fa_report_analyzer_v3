@@ -104,7 +104,7 @@ async function saveConfig() {
             await api.saveConfig(config);
             console.log('[Config] Saved to server');
         } catch (error) {
-            console.log('[Config] Server save not available:', error.message);
+            console.log('[Config] Server save not available:', error);
         }
 
         showGlobalSuccess('設定已保存');
