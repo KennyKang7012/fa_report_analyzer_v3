@@ -10,6 +10,7 @@ class AnalysisTaskCreate(BaseModel):
     backend: str = Field(default="ollama", description="LLM backend (ollama, openai, anthropic)")
     model: Optional[str] = Field(default=None, description="Model name (auto if not specified)")
     api_key: Optional[str] = Field(default=None, description="API key for the LLM backend")
+    base_url: Optional[str] = Field(default=None, description="API base URL for OpenAI-compatible endpoints")
     skip_images: bool = Field(default=False, description="Skip image analysis")
 
 

@@ -15,6 +15,7 @@ class FAReportAnalyzerService:
         backend: str = "ollama",
         model: Optional[str] = None,
         api_key: Optional[str] = None,
+        base_url: Optional[str] = None,
         skip_images: bool = False,
         progress_callback: Optional[Callable[[int, str], None]] = None
     ) -> Dict:
@@ -26,6 +27,7 @@ class FAReportAnalyzerService:
             backend: LLM backend ('ollama', 'openai', 'anthropic')
             model: Model name (auto if not specified)
             api_key: API key for the LLM backend
+            base_url: API base URL for OpenAI-compatible endpoints
             skip_images: Skip image analysis
             progress_callback: Progress callback function (progress, message)
 
@@ -40,6 +42,7 @@ class FAReportAnalyzerService:
                 backend=backend,
                 model=model,
                 api_key=api_key,
+                base_url=base_url,
                 skip_images=skip_images
             )
 

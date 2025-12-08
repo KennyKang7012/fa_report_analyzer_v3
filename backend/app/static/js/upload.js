@@ -61,6 +61,10 @@ export function initUploadPage() {
         startAnalysisHandler = handleStartAnalysis;
         startBtn.addEventListener('click', startAnalysisHandler);
 
+        // 後端選擇變化事件 - 自動切換對應的 Base URL
+        const backendSelect = document.getElementById('backend-select');
+        backendSelect.addEventListener('change', handleBackendChange);
+
         isInitialized = true;
     } else {
         console.log('[Upload] Already initialized - skipping event binding');
@@ -186,6 +190,7 @@ async function handleStartAnalysis() {
         // 獲取分析配置
         const backend = document.getElementById('backend-select').value;
         const model = document.getElementById('model-select').value.trim();
+        const baseUrl = document.getElementById('base-url-input').value.trim();
         const apiKey = document.getElementById('api-key-input').value.trim();
         const skipImages = document.getElementById('skip-images').checked;
 
@@ -196,6 +201,7 @@ async function handleStartAnalysis() {
             filename: uploadResult.filename,  // 傳遞原始文件名
             backend: backend,
             model: model || undefined,
+            base_url: baseUrl || undefined,
             api_key: apiKey || undefined,
             skip_images: skipImages
         });
@@ -261,6 +267,9 @@ async function loadSavedConfig() {
                     document.getElementById('skip-images').checked = serverConfig.default_skip_images;
                 }
 
+                // 根據後端類型載入對應的 Base URL
+                updateBaseUrlFromConfig(serverConfig);
+
                 console.log('[Upload] Loaded config from server');
             }
         } catch (error) {
@@ -268,6 +277,54 @@ async function loadSavedConfig() {
         }
     } catch (error) {
         console.error('[Upload] Error loading config:', error);
+    }
+}
+
+/**
+ * 根據系統配置更新 Base URL
+ */
+function updateBaseUrlFromConfig(config) {
+    const backend = document.getElementById('backend-select').value;
+    const baseUrlInput = document.getElementById('base-url-input');
+
+    // 根據選擇的後端載入對應的 Base URL
+    if (backend === 'openai' && config.openai_base_url) {
+        baseUrlInput.value = config.openai_base_url;
+        baseUrlInput.placeholder = config.openai_base_url;
+    } else if (backend === 'ollama' && config.ollama_base_url) {
+        baseUrlInput.value = config.ollama_base_url;
+        baseUrlInput.placeholder = config.ollama_base_url;
+    } else {
+        baseUrlInput.value = '';
+        if (backend === 'openai') {
+            baseUrlInput.placeholder = '例如: http://llm.emc.com.tw:4000/v1';
+        } else if (backend === 'ollama') {
+            baseUrlInput.placeholder = '例如: http://localhost:11434';
+        } else {
+            baseUrlInput.placeholder = '例如: http://llm.emc.com.tw:4000/v1';
+        }
+    }
+}
+
+/**
+ * 處理後端選擇變化
+ */
+async function handleBackendChange() {
+    console.log('[Upload] Backend changed, updating Base URL...');
+
+    try {
+        // 從伺服器載入配置
+        const serverConfig = await api.getConfig();
+        if (serverConfig) {
+            updateBaseUrlFromConfig(serverConfig);
+        } else {
+            // 如果沒有伺服器配置，只更新 placeholder
+            updateBaseUrlFromConfig({});
+        }
+    } catch (error) {
+        console.log('[Upload] Could not load server config:', error);
+        // 更新 placeholder
+        updateBaseUrlFromConfig({});
     }
 }
 

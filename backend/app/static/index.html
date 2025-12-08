@@ -104,6 +104,16 @@
                                 </div>
                             </div>
                             <div class="mb-3">
+                                <label for="base-url-input" class="form-label">
+                                    Base URL (可選)
+                                    <i class="bi bi-info-circle" data-bs-toggle="tooltip"
+                                       title="API 端點地址，留空使用系統設定或默認值"></i>
+                                </label>
+                                <input type="text" id="base-url-input" class="form-control"
+                                       placeholder="例如: http://llm.emc.com.tw:4000/v1">
+                                <small class="text-muted">支援 OpenAI 兼容的自定義端點</small>
+                            </div>
+                            <div class="mb-3">
                                 <label for="api-key-input" class="form-label">API Key (可選)</label>
                                 <input type="password" id="api-key-input" class="form-control"
                                        placeholder="使用 OpenAI/Anthropic 時需要">
@@ -371,19 +381,41 @@
 
                     <div class="card mb-3">
                         <div class="card-header">
-                            <h5 class="mb-0"><i class="bi bi-key"></i> API Key 管理</h5>
+                            <h5 class="mb-0"><i class="bi bi-key"></i> API 配置</h5>
                         </div>
                         <div class="card-body">
+                            <h6 class="text-muted mb-3">OpenAI 配置</h6>
+                            <div class="mb-3">
+                                <label for="openai-base-url" class="form-label">OpenAI Base URL</label>
+                                <input type="text" id="openai-base-url" class="form-control"
+                                       placeholder="https://api.openai.com/v1 或自定義端點">
+                                <small class="text-muted">支援 OpenAI 兼容的 API 端點</small>
+                            </div>
                             <div class="mb-3">
                                 <label for="openai-api-key" class="form-label">OpenAI API Key</label>
                                 <input type="password" id="openai-api-key" class="form-control"
                                        placeholder="sk-...">
                             </div>
+
+                            <hr class="my-4">
+
+                            <h6 class="text-muted mb-3">Ollama 配置</h6>
+                            <div class="mb-3">
+                                <label for="ollama-base-url" class="form-label">Ollama Base URL</label>
+                                <input type="text" id="ollama-base-url" class="form-control"
+                                       placeholder="http://localhost:11434 或自定義端點">
+                                <small class="text-muted">Ollama 服務端點地址</small>
+                            </div>
+
+                            <hr class="my-4">
+
+                            <h6 class="text-muted mb-3">Anthropic 配置</h6>
                             <div class="mb-3">
                                 <label for="anthropic-api-key" class="form-label">Anthropic API Key</label>
                                 <input type="password" id="anthropic-api-key" class="form-control"
                                        placeholder="sk-ant-...">
                             </div>
+
                             <p class="small text-muted">
                                 <i class="bi bi-shield-lock"></i> API Key 將加密存儲在本地資料庫
                             </p>

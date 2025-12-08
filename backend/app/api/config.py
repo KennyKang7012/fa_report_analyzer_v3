@@ -11,39 +11,47 @@ from ..database import get_db
 from ..models.config import SystemConfig
 from ..schemas.config import ConfigItem, ConfigUpdate, ConfigResponse
 from ..core.security import get_security_manager
+from ..config import settings
 
 router = APIRouter(prefix="/api/v1", tags=["config"])
 logger = logging.getLogger(__name__)
 
 
-@router.get("/config", response_model=List[ConfigResponse])
+@router.get("/config")
 async def get_all_configs(db: Session = Depends(get_db)):
     """
-    獲取所有配置項
+    獲取所有配置項（合併數據庫配置和環境變量）
 
     Returns:
-        配置項列表,敏感信息已脫敏
+        配置字典,包含數據庫配置和環境變量
     """
+    # 從數據庫讀取配置
     configs = db.query(SystemConfig).all()
 
-    result = []
+    # 轉換為字典格式
+    config_dict = {}
     for config in configs:
         # API Key 類配置顯示為掩碼
         if "api_key" in config.key.lower() or "key" in config.key.lower():
-            display_value = mask_api_key(config.value)
+            config_dict[config.key] = mask_api_key(config.value)
+            config_dict[f"{config.key}_set"] = True
         else:
-            display_value = config.value
+            config_dict[config.key] = config.value
 
-        result.append({
-            "id": config.id,
-            "key": config.key,
-            "value": display_value,
-            "is_encrypted": "api_key" in config.key.lower() or "key" in config.key.lower(),
-            "created_at": config.created_at,
-            "updated_at": config.updated_at
-        })
+    # 從環境變量讀取配置（如果數據庫中沒有）
+    env_mapping = {
+        'openai_base_url': settings.OPENAI_BASE_URL,
+        'ollama_base_url': settings.OLLAMA_BASE_URL,
+        'default_model': settings.DEFAULT_MODEL,
+    }
 
-    return result
+    for key, env_value in env_mapping.items():
+        # 只在數據庫中沒有配置時使用環境變量
+        if key not in config_dict and env_value:
+            config_dict[key] = env_value
+            logger.info(f"從環境變量讀取配置: {key}")
+
+    return config_dict
 
 
 @router.get("/config/{key}", response_model=ConfigResponse)
@@ -166,6 +174,8 @@ async def _save_flat_config(config_data: dict, db: Session):
     config_mapping = {
         'default_backend': (False, str),
         'default_model': (False, str),
+        'openai_base_url': (False, str),
+        'ollama_base_url': (False, str),
         'openai_api_key': (True, str),
         'anthropic_api_key': (True, str),
         'default_skip_images': (False, bool),
@@ -247,6 +257,8 @@ async def save_flat_config(
     config_mapping = {
         'default_backend': (False, str),
         'default_model': (False, str),
+        'openai_base_url': (False, str),
+        'ollama_base_url': (False, str),
         'openai_api_key': (True, str),
         'anthropic_api_key': (True, str),
         'default_skip_images': (False, bool),

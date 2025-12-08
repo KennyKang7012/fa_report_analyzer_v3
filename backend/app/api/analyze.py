@@ -9,6 +9,7 @@ import logging
 
 from ..database import get_db, SessionLocal
 from ..models.task import AnalysisTask, TaskStatus
+from ..models.config import SystemConfig
 from ..schemas.task import AnalysisTaskCreate, AnalysisTaskResponse
 from ..services.analyzer import FAReportAnalyzerService
 from ..services.task_manager import TaskManager
@@ -16,6 +17,24 @@ from ..config import settings
 
 router = APIRouter(prefix="/api/v1", tags=["analyze"])
 logger = logging.getLogger(__name__)
+
+
+def get_config_value(db: Session, key: str, default: str = None) -> str:
+    """
+    從數據庫獲取配置值
+
+    Args:
+        db: 數據庫會話
+        key: 配置鍵
+        default: 默認值
+
+    Returns:
+        配置值
+    """
+    config = db.query(SystemConfig).filter(SystemConfig.key == key).first()
+    if config:
+        return config.value
+    return default
 
 
 async def run_analysis_background(task_id: str, file_path: str, config: dict):
@@ -52,6 +71,7 @@ async def run_analysis_background(task_id: str, file_path: str, config: dict):
             backend=config["backend"],
             model=config.get("model"),
             api_key=config.get("api_key"),
+            base_url=config.get("base_url"),
             skip_images=config.get("skip_images", False),
             progress_callback=progress_callback
         )
@@ -111,13 +131,64 @@ async def create_analysis_task(
             detail=f"不支援的 backend: {request.backend}。支援: {', '.join(valid_backends)}"
         )
 
+    # 處理 API Key 和 base_url：優先級為 請求參數 > 數據庫配置 > 環境變量
+    api_key = request.api_key
+    base_url = request.base_url
+    model = request.model
+
+    # 如果沒有提供，依次從數據庫和環境變量讀取
+    if request.backend == "openai":
+        # API Key
+        if not api_key:
+            # 先從數據庫讀取
+            db_api_key = get_config_value(db, 'openai_api_key')
+            if db_api_key:
+                api_key = db_api_key
+                logger.info("使用數據庫中的 OPENAI_API_KEY")
+            elif settings.OPENAI_API_KEY:
+                api_key = settings.OPENAI_API_KEY
+                logger.info("使用環境變量中的 OPENAI_API_KEY")
+
+        # Base URL
+        if not base_url:
+            # 先從數據庫讀取
+            db_base_url = get_config_value(db, 'openai_base_url')
+            if db_base_url:
+                base_url = db_base_url
+                logger.info(f"使用數據庫中的 OPENAI_BASE_URL: {base_url}")
+            elif settings.OPENAI_BASE_URL:
+                base_url = settings.OPENAI_BASE_URL
+                logger.info(f"使用環境變量中的 OPENAI_BASE_URL: {base_url}")
+
+        # Model
+        if not model:
+            # 先從數據庫讀取
+            db_model = get_config_value(db, 'default_model')
+            if db_model:
+                model = db_model
+                logger.info(f"使用數據庫中的 DEFAULT_MODEL: {model}")
+            elif settings.DEFAULT_MODEL:
+                model = settings.DEFAULT_MODEL
+                logger.info(f"使用環境變量中的 DEFAULT_MODEL: {model}")
+
+    elif request.backend == "ollama":
+        # Ollama Base URL
+        if not base_url:
+            db_base_url = get_config_value(db, 'ollama_base_url')
+            if db_base_url:
+                base_url = db_base_url
+                logger.info(f"使用數據庫中的 OLLAMA_BASE_URL: {base_url}")
+            elif settings.OLLAMA_BASE_URL:
+                base_url = settings.OLLAMA_BASE_URL
+                logger.info(f"使用環境變量中的 OLLAMA_BASE_URL: {base_url}")
+
     # 創建分析任務
     task = AnalysisTask(
         filename=filename,
         file_path=file_path,
         status=TaskStatus.PENDING.value,
         backend=request.backend,
-        model=request.model or "auto",
+        model=model or "auto",
         skip_images=1 if request.skip_images else 0
     )
 
@@ -134,8 +205,9 @@ async def create_analysis_task(
         file_path,
         {
             "backend": request.backend,
-            "model": request.model,
-            "api_key": request.api_key,
+            "model": model,
+            "api_key": api_key,
+            "base_url": base_url,
             "skip_images": request.skip_images
         }
     )

@@ -63,6 +63,14 @@ function displayConfig(config) {
         document.getElementById('default-model').value = config.default_model;
     }
 
+    // Base URLs
+    if (config.openai_base_url) {
+        document.getElementById('openai-base-url').value = config.openai_base_url;
+    }
+    if (config.ollama_base_url) {
+        document.getElementById('ollama-base-url').value = config.ollama_base_url;
+    }
+
     // API Keys (顯示為隱藏,不顯示實際值)
     if (config.openai_api_key_set) {
         document.getElementById('openai-api-key').placeholder = '已設置 (輸入新值以更新)';
@@ -88,6 +96,8 @@ async function saveConfig() {
         const config = {
             default_backend: document.getElementById('default-backend').value,
             default_model: document.getElementById('default-model').value.trim(),
+            openai_base_url: document.getElementById('openai-base-url').value.trim(),
+            ollama_base_url: document.getElementById('ollama-base-url').value.trim(),
             openai_api_key: document.getElementById('openai-api-key').value.trim(),
             anthropic_api_key: document.getElementById('anthropic-api-key').value.trim(),
             default_skip_images: document.getElementById('default-skip-images').checked,
@@ -139,6 +149,8 @@ function resetConfig() {
     const defaultConfig = {
         default_backend: 'ollama',
         default_model: '',
+        openai_base_url: '',
+        ollama_base_url: '',
         openai_api_key: '',
         anthropic_api_key: '',
         default_skip_images: false,
@@ -151,7 +163,9 @@ function resetConfig() {
     // 清空本地存儲
     localStorage.removeItem('faAnalyzerConfig');
 
-    // 清空密碼欄位
+    // 清空所有欄位
+    document.getElementById('openai-base-url').value = '';
+    document.getElementById('ollama-base-url').value = '';
     document.getElementById('openai-api-key').value = '';
     document.getElementById('anthropic-api-key').value = '';
     document.getElementById('openai-api-key').placeholder = 'sk-...';
@@ -180,10 +194,12 @@ function loadLocalConfig() {
  */
 function saveLocalConfig(config) {
     try {
-        // 不保存實際的 API Key 到本地存儲,只保存標記
+        // 不保存實際的 API Key 到本地存儲,只保存標記和其他配置
         const configToSave = {
             default_backend: config.default_backend,
             default_model: config.default_model,
+            openai_base_url: config.openai_base_url,
+            ollama_base_url: config.ollama_base_url,
             default_skip_images: config.default_skip_images,
             auto_download: config.auto_download,
             openai_api_key_set: !!config.openai_api_key,
