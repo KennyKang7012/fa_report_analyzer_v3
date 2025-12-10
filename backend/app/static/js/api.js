@@ -246,25 +246,22 @@ export const api = {
                 throw new Error(`獲取配置失敗 (${response.status})`);
             }
 
-            const configItems = await response.json();
-            console.log('[API] Config fetched');
+            const configData = await response.json();
+            console.log('[API] Config fetched:', configData);
 
-            // 將配置列表轉換為扁平對象
+            // 後端已經返回字典格式，直接處理布爾值轉換
             const config = {};
-            configItems.forEach(item => {
+
+            for (const [key, value] of Object.entries(configData)) {
                 // 布爾值轉換
-                if (item.key === 'default_skip_images' || item.key === 'auto_download') {
-                    config[item.key] = item.value === 'true';
+                if (key === 'default_skip_images' || key === 'auto_download') {
+                    config[key] = value === 'true' || value === true;
                 }
-                // API Key 設置標記
-                else if (item.key === 'openai_api_key' || item.key === 'anthropic_api_key') {
-                    config[`${item.key}_set`] = item.value && item.value !== '';
-                }
-                // 其他配置
+                // 其他配置直接使用
                 else {
-                    config[item.key] = item.value;
+                    config[key] = value;
                 }
-            });
+            }
 
             return config;
         } catch (error) {

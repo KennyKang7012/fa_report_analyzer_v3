@@ -7,6 +7,104 @@
 
 ---
 
+## [3.0.4] - 2025-12-10
+
+### 🐛 Bug 修復
+
+#### Windows 系統相容性問題修復（嚴重）
+- **修復 Windows 系統下網頁完全無反應的問題**
+  - 問題：在公司 Windows 桌上型電腦部署時，瀏覽器打開網頁後所有點擊操作均無反應，應用完全無法使用
+  - 原因：FastAPI 的 `StaticFiles` 在 Windows 上依賴系統註冊表來確定 MIME type，導致 `.js` 文件以 `text/plain` 返回而非 `application/javascript`，瀏覽器拒絕執行模塊
+  - 解決方案：
+    - 創建自定義 `FixedStaticFiles` 類繼承 `StaticFiles`
+    - 覆寫 `get_response()` 方法，強制為靜態文件設置正確的 MIME type
+    - 內建 14 種常見 Web 文件類型的 MIME type 映射表
+    - 不依賴系統註冊表，確保跨平台一致性
+  - 影響文件：`backend/app/main.py:24-100`
+  - 測試環境：Windows 10/11 桌上型電腦與電競筆電
+
+- **修復 API getConfig 格式不匹配導致的崩潰**
+  - 問題：電競筆電測試時，控制台顯示 `TypeError: configItems.forEach is not a function`，配置系統無法正常工作
+  - 原因：後端 API 返回字典格式 `{key: value, ...}`，前端錯誤地期望數組格式並調用 `forEach()` 方法
+  - 解決方案：
+    - 重構前端 `getConfig()` 方法使用 `Object.entries()` 處理字典
+    - 移除錯誤的 `forEach` 調用
+    - 保留布爾值轉換邏輯
+    - 添加詳細日誌輸出
+  - 影響文件：`backend/app/static/js/api.js:241-271`
+
+- **修復 Favicon 404 錯誤**
+  - 問題：瀏覽器自動請求 `/favicon.ico` 返回 404 錯誤，在控制台和伺服器日誌中產生錯誤訊息
+  - 原因：專案中未提供 favicon.ico 文件且無對應路由處理
+  - 解決方案：
+    - 添加 `/favicon.ico` 路由
+    - 返回 `204 No Content` 狀態碼（標準做法）
+    - 告訴瀏覽器該網站沒有 favicon
+  - 影響文件：`backend/app/main.py:109-114`
+
+### 🔧 變更
+
+#### 跨平台相容性改進
+- **自定義 StaticFiles 中間件**
+  - 新增 `FixedStaticFiles` 類支持 14 種文件類型
+  - 內建 MIME type 映射：JavaScript、CSS、HTML、JSON、圖片、字體等
+  - 確保在 Windows/Linux/macOS 上行為一致
+
+#### API 數據處理優化
+- **改進配置 API 處理**
+  - 使用 `Object.entries()` 正確處理字典格式
+  - 增強布爾值轉換邏輯（支持字符串和布爾值）
+  - 添加詳細的調試日誌
+
+### 📝 技術細節
+
+**MIME Type 映射表：**
+```python
+MIME_TYPES = {
+    '.js': 'application/javascript',
+    '.css': 'text/css',
+    '.html': 'text/html',
+    '.json': 'application/json',
+    '.png': 'image/png',
+    '.jpg': 'image/jpeg',
+    # ... 共 14 種文件類型
+}
+```
+
+**API 格式處理：**
+```javascript
+// 後端返回：{key1: value1, key2: value2, ...}
+// 前端處理：
+for (const [key, value] of Object.entries(configData)) {
+  if (key === 'default_skip_images' || key === 'auto_download') {
+    config[key] = value === 'true' || value === true;
+  } else {
+    config[key] = value;
+  }
+}
+```
+
+### ✅ 測試驗證
+- ✅ Windows 10/11 桌上型電腦測試通過
+- ✅ Windows 電競筆電測試通過
+- ✅ JavaScript 模塊正確加載（MIME type: application/javascript）
+- ✅ 所有點擊操作正常響應
+- ✅ 配置系統正常工作
+- ✅ 無 404 錯誤（favicon 返回 204）
+- ✅ 控制台無錯誤訊息
+
+### 📊 統計數據
+- 變更文件：2 個
+- 程式碼新增：約 62 行
+- 程式碼修改：約 27 行
+- 修復 Bug 數：3 個（1 個嚴重、1 個高優先級、1 個低優先級）
+- 測試平台：Windows 10/11
+
+### 📖 相關文件
+- 詳細報告：`docs/web_v3.0/WINDOWS_COMPATIBILITY_BUG_FIX_REPORT.md`
+
+---
+
 ## [3.0.2] - 2025-12-09
 
 ### 🐛 Bug 修復

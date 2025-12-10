@@ -4,6 +4,8 @@ from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pathlib import Path
 import logging
+from starlette.responses import Response
+from starlette.types import Scope
 
 from .database import init_db
 from . import models  # Import models to register them with Base
@@ -17,6 +19,47 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
+
+
+class FixedStaticFiles(StaticFiles):
+    """
+    自定義 StaticFiles 類，修復 Windows 系統上的 MIME type 問題
+    強制為 JavaScript 文件設置正確的 Content-Type
+    """
+
+    # MIME type 映射表
+    MIME_TYPES = {
+        '.js': 'application/javascript',
+        '.mjs': 'application/javascript',
+        '.css': 'text/css',
+        '.html': 'text/html',
+        '.json': 'application/json',
+        '.png': 'image/png',
+        '.jpg': 'image/jpeg',
+        '.jpeg': 'image/jpeg',
+        '.gif': 'image/gif',
+        '.svg': 'image/svg+xml',
+        '.ico': 'image/x-icon',
+        '.woff': 'font/woff',
+        '.woff2': 'font/woff2',
+        '.ttf': 'font/ttf',
+        '.eot': 'application/vnd.ms-fontobject',
+    }
+
+    async def get_response(self, path: str, scope: Scope) -> Response:
+        """覆寫 get_response 方法以設置正確的 MIME type"""
+        response = await super().get_response(path, scope)
+
+        # 獲取文件擴展名
+        file_ext = Path(path).suffix.lower()
+
+        # 如果有匹配的 MIME type，強制設置
+        if file_ext in self.MIME_TYPES:
+            response.headers['Content-Type'] = self.MIME_TYPES[file_ext]
+            logger.debug(f"Set MIME type for {path}: {self.MIME_TYPES[file_ext]}")
+
+        return response
+
 
 app = FastAPI(
     title="FA Report Analyzer API",
@@ -52,15 +95,23 @@ app.include_router(history.router)
 
 logger.info("已註冊 API 路由: upload, analyze, result, config, history")
 
-# Mount static files directory
+# Mount static files directory with fixed MIME types
 static_path = Path(__file__).parent / "static"
-app.mount("/static", StaticFiles(directory=str(static_path)), name="static")
+app.mount("/static", FixedStaticFiles(directory=str(static_path)), name="static")
 
 
 # Root route returns frontend page
 @app.get("/")
 async def read_root():
     return FileResponse(str(static_path / "index.html"))
+
+
+# Favicon route to prevent 404 errors
+@app.get("/favicon.ico")
+async def favicon():
+    """返回空響應以避免 favicon 404 錯誤"""
+    from fastapi import Response
+    return Response(status_code=204)
 
 
 # Custom ReDoc route with working CDN
