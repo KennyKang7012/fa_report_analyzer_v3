@@ -7,6 +7,89 @@
 
 ---
 
+## [3.0.6] - 2025-12-11
+
+### 🐛 Bug 修復
+
+#### 修復配置同步與切換問題
+- **修復 Ollama 配置混雜 OpenAI 配置問題**
+  - 問題：在系統設定頁面選擇 Ollama 後端並清空 Model，切換到首頁時仍顯示上次 OpenAI 的 Model 和 API Key
+  - 根因：`loadSavedConfig()` 在第一次載入時 `previousBackend` 為空，導致 `backendChanged` 判斷失效；`default_model` 是全局的，不區分後端
+  - 解決方案：
+    - 新增 `isFirstLoad` 判斷，檢測是否第一次載入
+    - 只有當 `default_model` 與 `default_backend` 匹配時才載入
+    - 否則清空 model（不同後端的模型不兼容）
+    - API Key 始終清空（出於安全性考慮）
+  - 影響文件：`backend/app/static/js/upload.js:274-298`
+
+- **改進手動切換後端的配置清理**
+  - 問題：在首頁手動切換後端時，Model 和 API Key 沒有自動清空
+  - 解決方案：`handleBackendChange()` 函數改進，切換後端時自動清空 Model 和 API Key
+  - 影響文件：`backend/app/static/js/upload.js:318-382`
+
+### ✨ 新功能
+
+#### 新增「保存為默認配置」功能
+- **在首頁添加配置保存按鈕**
+  - 用戶在首頁臨時配置後，可點擊「保存為默認配置」按鈕
+  - 自動將當前配置保存到系統設定
+  - 根據後端類型正確保存對應的 Base URL
+  - 保存到 localStorage 和伺服器
+  - 下次進入首頁時自動載入
+  - 影響文件：
+    - `backend/app/static/index.html:135-137`（UI 按鈕）
+    - `backend/app/static/js/upload.js:65-68,387-431`（功能實現）
+
+### 🔧 變更
+
+#### 配置載入策略優化
+- **智能配置載入邏輯**
+  - 第一次載入或 backend 改變：載入系統配置，清空不匹配的 model
+  - backend 未變：保留用戶輸入，不覆蓋
+  - API Key 始終不從配置載入（安全性）
+
+#### 配置同步邏輯改進
+- **雙向配置同步**
+  - 系統設定 → 首頁：自動同步（`loadSavedConfig`）
+  - 首頁 → 系統設定：手動同步（點擊「保存為默認配置」按鈕）
+
+---
+
+## [3.0.5] - 2025-12-11
+
+### 🐛 Bug 修復
+
+#### 修復配置載入與編碼錯誤
+- **修復 BASE URL 配置未正確載入問題**
+  - 問題：在系統設定頁面配置 LLM 後端和 Base URL 後，切換到首頁時 Base URL 輸入框為空
+  - 根因：`loadSavedConfig()` 函數載入配置後沒有呼叫 `updateBaseUrlFromConfig()` 更新 Base URL
+  - 解決方案：
+    - 新增 `finalConfig` 變數追蹤完整配置
+    - 在函數最後統一呼叫 `updateBaseUrlFromConfig(finalConfig)`
+  - 影響文件：`backend/app/static/js/upload.js:236-283`
+
+- **修復 Windows cp950 編碼錯誤**
+  - 問題：分析任務執行時出現 `'cp950' codec can't encode character '\u2713'` 錯誤
+  - 根因：`fa_analyzer_core.py` 中使用 Unicode 字符（✓, ⚠️），Windows 系統默認 cp950 編碼無法處理
+  - 解決方案：在應用啟動時強制設置 UTF-8 編碼
+  - 影響文件：`backend/app/main.py:12-15`
+
+- **修復下載按鈕重複觸發問題**
+  - 問題：點擊下載按鈕一次，觸發多次下載請求
+  - 根因：`initResultPage()` 每次被調用時都會添加新的事件監聽器
+  - 解決方案：新增 `isInitialized` 標記，只在第一次初始化時綁定事件
+  - 影響文件：`backend/app/static/js/result.js:12-56`
+
+### ✨ 新功能
+
+#### 新增分析配置日誌輸出
+- **在終端顯示分析配置信息**
+  - 分析任務開始時輸出使用的 LLM 後端、模型名稱、Base URL
+  - 方便調試和追蹤分析過程
+  - 影響文件：`backend/app/api/analyze.py:54-64`
+
+---
+
 ## [3.0.4] - 2025-12-10
 
 ### 🐛 Bug 修復
