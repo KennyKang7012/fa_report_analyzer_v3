@@ -61,6 +61,12 @@ export function initUploadPage() {
         startAnalysisHandler = handleStartAnalysis;
         startBtn.addEventListener('click', startAnalysisHandler);
 
+        // 保存為默認配置按鈕
+        const saveAsDefaultBtn = document.getElementById('save-as-default-btn');
+        if (saveAsDefaultBtn) {
+            saveAsDefaultBtn.addEventListener('click', handleSaveAsDefault);
+        }
+
         // 後端選擇變化事件 - 自動切換對應的 Base URL
         const backendSelect = document.getElementById('backend-select');
         backendSelect.addEventListener('change', handleBackendChange);
@@ -70,7 +76,7 @@ export function initUploadPage() {
         console.log('[Upload] Already initialized - skipping event binding');
     }
 
-    // 每次都載入配置
+    // 每次都載入配置，但會智能處理不覆蓋用戶輸入
     loadSavedConfig();
 
     // 重置 UI 狀態
@@ -233,6 +239,9 @@ async function handleStartAnalysis() {
  */
 async function loadSavedConfig() {
     try {
+        // 記錄當前的 backend（用於檢測是否改變）
+        const previousBackend = document.getElementById('backend-select').value;
+
         let finalConfig = {}; // 用於存儲最終的配置
 
         // 先從本地存儲載入
@@ -240,17 +249,6 @@ async function loadSavedConfig() {
         if (savedConfig) {
             const config = JSON.parse(savedConfig);
             finalConfig = { ...config }; // 保存到 finalConfig
-
-            if (config.default_backend) {
-                document.getElementById('backend-select').value = config.default_backend;
-            }
-            if (config.default_model) {
-                document.getElementById('model-select').value = config.default_model;
-            }
-            // 使用 default_skip_images（從系統設定）
-            if (config.default_skip_images !== undefined) {
-                document.getElementById('skip-images').checked = config.default_skip_images;
-            }
 
             console.log('[Upload] Loaded config from localStorage');
         }
@@ -260,26 +258,50 @@ async function loadSavedConfig() {
             const serverConfig = await api.getConfig();
             if (serverConfig) {
                 finalConfig = { ...finalConfig, ...serverConfig }; // 合併配置
-
-                if (serverConfig.default_backend) {
-                    document.getElementById('backend-select').value = serverConfig.default_backend;
-                }
-                if (serverConfig.default_model) {
-                    document.getElementById('model-select').value = serverConfig.default_model;
-                }
-                // 應用系統設定中的 default_skip_images
-                if (serverConfig.default_skip_images !== undefined) {
-                    document.getElementById('skip-images').checked = serverConfig.default_skip_images;
-                }
-
                 console.log('[Upload] Loaded config from server');
             }
         } catch (error) {
             console.log('[Upload] Server config not available, using localStorage');
         }
 
-        // 【修復】無論配置來源如何，都要根據當前的 backend 更新 Base URL
+        // 設置 backend
+        if (finalConfig.default_backend) {
+            document.getElementById('backend-select').value = finalConfig.default_backend;
+        }
+
+        // 設置 skip_images
+        if (finalConfig.default_skip_images !== undefined) {
+            document.getElementById('skip-images').checked = finalConfig.default_skip_images;
+        }
+
+        // 【修復】根據當前的 backend 更新 Base URL
         updateBaseUrlFromConfig(finalConfig);
+
+        // 【修復】智能處理 Model 和 API Key
+        const currentBackend = document.getElementById('backend-select').value;
+
+        // 檢查是否是第一次載入，或 backend 是否改變
+        const isFirstLoad = !previousBackend;
+        const backendChanged = previousBackend && previousBackend !== currentBackend;
+
+        if (isFirstLoad || backendChanged) {
+            // 第一次載入或 backend 改變時：
+            // 1. 如果有 default_model 且與當前 backend 匹配，則載入
+            // 2. 否則清空 model
+            if (finalConfig.default_model && finalConfig.default_backend === currentBackend) {
+                document.getElementById('model-select').value = finalConfig.default_model;
+                console.log('[Upload] Loaded default_model for', currentBackend);
+            } else {
+                document.getElementById('model-select').value = '';
+                console.log('[Upload] Cleared model (backend changed or no default)');
+            }
+
+            // 清空 API Key
+            document.getElementById('api-key-input').value = '';
+        } else {
+            // backend 沒變，保留用戶輸入的 model 和 API Key（不覆蓋）
+            console.log('[Upload] Preserving user input');
+        }
 
     } catch (error) {
         console.error('[Upload] Error loading config:', error);
@@ -318,19 +340,93 @@ function updateBaseUrlFromConfig(config) {
 async function handleBackendChange() {
     console.log('[Upload] Backend changed, updating Base URL...');
 
+    const backend = document.getElementById('backend-select').value;
+
+    // 清空 Model 和 API Key（因為不同後端的配置不同）
+    document.getElementById('model-select').value = '';
+    document.getElementById('api-key-input').value = '';
+
     try {
-        // 從伺服器載入配置
-        const serverConfig = await api.getConfig();
-        if (serverConfig) {
-            updateBaseUrlFromConfig(serverConfig);
-        } else {
-            // 如果沒有伺服器配置，只更新 placeholder
-            updateBaseUrlFromConfig({});
+        // 優先從 localStorage 載入配置（包含兩個後端的 Base URL）
+        let config = {};
+        const savedConfig = localStorage.getItem('faAnalyzerConfig');
+        if (savedConfig) {
+            config = JSON.parse(savedConfig);
         }
+
+        // 從伺服器載入配置（覆蓋）
+        try {
+            const serverConfig = await api.getConfig();
+            if (serverConfig) {
+                config = { ...config, ...serverConfig };
+            }
+        } catch (error) {
+            console.log('[Upload] Server config not available, using localStorage');
+        }
+
+        // 根據當前選擇的後端更新 Base URL
+        updateBaseUrlFromConfig(config);
+
+        // 根據後端載入對應的默認模型
+        if (backend === 'openai' && config.default_model) {
+            document.getElementById('model-select').value = config.default_model;
+        } else if (backend === 'ollama' && config.default_model) {
+            document.getElementById('model-select').value = config.default_model;
+        }
+
     } catch (error) {
-        console.log('[Upload] Could not load server config:', error);
+        console.error('[Upload] Error in handleBackendChange:', error);
         // 更新 placeholder
         updateBaseUrlFromConfig({});
+    }
+}
+
+/**
+ * 保存為默認配置
+ */
+async function handleSaveAsDefault() {
+    try {
+        // 獲取當前的配置
+        const backend = document.getElementById('backend-select').value;
+        const model = document.getElementById('model-select').value.trim();
+        const baseUrl = document.getElementById('base-url-input').value.trim();
+        const apiKey = document.getElementById('api-key-input').value.trim();
+        const skipImages = document.getElementById('skip-images').checked;
+
+        // 構建配置對象
+        const config = {
+            default_backend: backend,
+            default_model: model,
+            default_skip_images: skipImages,
+            // 根據不同的後端保存 Base URL
+            openai_base_url: backend === 'openai' ? baseUrl : '',
+            ollama_base_url: backend === 'ollama' ? baseUrl : '',
+            // API Key（如果有）
+            openai_api_key: backend === 'openai' ? apiKey : '',
+            anthropic_api_key: backend === 'anthropic' ? apiKey : ''
+        };
+
+        console.log('[Upload] Saving as default config:', config);
+
+        // 保存到 localStorage
+        const configToSave = {
+            default_backend: config.default_backend,
+            default_model: config.default_model,
+            openai_base_url: config.openai_base_url,
+            ollama_base_url: config.ollama_base_url,
+            default_skip_images: config.default_skip_images,
+            openai_api_key_set: !!config.openai_api_key,
+            anthropic_api_key_set: !!config.anthropic_api_key
+        };
+        localStorage.setItem('faAnalyzerConfig', JSON.stringify(configToSave));
+
+        // 保存到伺服器
+        await api.saveConfig(config);
+
+        showGlobalSuccess('配置已保存為默認值');
+    } catch (error) {
+        console.error('[Upload] Error saving config:', error);
+        showGlobalError('保存配置失敗: ' + error.message);
     }
 }
 
