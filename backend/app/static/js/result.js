@@ -9,6 +9,12 @@ import { router, showGlobalError, showGlobalSuccess } from './app.js';
 let currentTaskId = null;
 let currentResult = null;
 let radarChart = null;
+let isInitialized = false; // 標記是否已初始化事件
+
+// 保存事件處理函數引用，以便移除
+let downloadTxtHandler = null;
+let downloadJsonHandler = null;
+let newAnalysisHandler = null;
 
 /**
  * 初始化結果頁面
@@ -25,13 +31,26 @@ export function initResultPage(params = {}) {
         return;
     }
 
-    // 載入結果
-    loadResult();
+    // 只在第一次初始化時綁定事件
+    if (!isInitialized) {
+        console.log('[Result] First time initialization - binding events');
 
-    // 綁定事件
-    document.getElementById('download-txt-btn').addEventListener('click', () => downloadReport('txt'));
-    document.getElementById('download-json-btn').addEventListener('click', () => downloadReport('json'));
-    document.getElementById('new-analysis-btn').addEventListener('click', () => router.navigate('home'));
+        // 綁定事件
+        downloadTxtHandler = () => downloadReport('txt');
+        downloadJsonHandler = () => downloadReport('json');
+        newAnalysisHandler = () => router.navigate('home');
+
+        document.getElementById('download-txt-btn').addEventListener('click', downloadTxtHandler);
+        document.getElementById('download-json-btn').addEventListener('click', downloadJsonHandler);
+        document.getElementById('new-analysis-btn').addEventListener('click', newAnalysisHandler);
+
+        isInitialized = true;
+    } else {
+        console.log('[Result] Already initialized - skipping event binding');
+    }
+
+    // 載入結果（每次都要重新載入）
+    loadResult();
 
     console.log('[Result] Page initialized');
 }

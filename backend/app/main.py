@@ -4,8 +4,15 @@ from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pathlib import Path
 import logging
+import sys
+import io
 from starlette.responses import Response
 from starlette.types import Scope
+
+# 修復 Windows 系統 cp950 編碼問題，確保支援 Unicode 字符
+if sys.platform == 'win32':
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8')
 
 from .database import init_db
 from . import models  # Import models to register them with Base

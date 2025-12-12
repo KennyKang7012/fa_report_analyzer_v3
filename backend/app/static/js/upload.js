@@ -233,10 +233,13 @@ async function handleStartAnalysis() {
  */
 async function loadSavedConfig() {
     try {
+        let finalConfig = {}; // 用於存儲最終的配置
+
         // 先從本地存儲載入
         const savedConfig = localStorage.getItem('faAnalyzerConfig');
         if (savedConfig) {
             const config = JSON.parse(savedConfig);
+            finalConfig = { ...config }; // 保存到 finalConfig
 
             if (config.default_backend) {
                 document.getElementById('backend-select').value = config.default_backend;
@@ -256,6 +259,8 @@ async function loadSavedConfig() {
         try {
             const serverConfig = await api.getConfig();
             if (serverConfig) {
+                finalConfig = { ...finalConfig, ...serverConfig }; // 合併配置
+
                 if (serverConfig.default_backend) {
                     document.getElementById('backend-select').value = serverConfig.default_backend;
                 }
@@ -267,14 +272,15 @@ async function loadSavedConfig() {
                     document.getElementById('skip-images').checked = serverConfig.default_skip_images;
                 }
 
-                // 根據後端類型載入對應的 Base URL
-                updateBaseUrlFromConfig(serverConfig);
-
                 console.log('[Upload] Loaded config from server');
             }
         } catch (error) {
             console.log('[Upload] Server config not available, using localStorage');
         }
+
+        // 【修復】無論配置來源如何，都要根據當前的 backend 更新 Base URL
+        updateBaseUrlFromConfig(finalConfig);
+
     } catch (error) {
         console.error('[Upload] Error loading config:', error);
     }

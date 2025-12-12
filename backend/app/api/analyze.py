@@ -51,6 +51,18 @@ async def run_analysis_background(task_id: str, file_path: str, config: dict):
     try:
         logger.info(f"開始後台分析任務: {task_id}")
 
+        # 記錄分析配置
+        backend = config["backend"]
+        model = config.get("model") or "auto"
+        base_url = config.get("base_url")
+        skip_images = config.get("skip_images", False)
+
+        logger.info(f"✓ 使用 {backend.upper()} 後端: {model}")
+        if base_url:
+            logger.info(f"✓ Base URL: {base_url}")
+        if skip_images:
+            logger.info(f"✓ 跳過圖片分析")
+
         # 更新任務狀態為處理中
         task = db.query(AnalysisTask).filter(AnalysisTask.id == task_id).first()
         if task:
@@ -68,11 +80,11 @@ async def run_analysis_background(task_id: str, file_path: str, config: dict):
         # 執行分析
         result = await analyzer.analyze_report(
             file_path=file_path,
-            backend=config["backend"],
+            backend=backend,
             model=config.get("model"),
             api_key=config.get("api_key"),
-            base_url=config.get("base_url"),
-            skip_images=config.get("skip_images", False),
+            base_url=base_url,
+            skip_images=skip_images,
             progress_callback=progress_callback
         )
 
